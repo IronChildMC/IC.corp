@@ -1,67 +1,103 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>IC.corp</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial;
-      background: linear-gradient(135deg, #0f172a, #1e3a8a);
-      color: white;
-    }
+<meta charset="UTF-8">
+<title>IC.corp</title>
 
-    header {
-      text-align: center;
-      padding: 50px;
-      font-size: 40px;
-      font-weight: bold;
-      color: #38bdf8;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
 
-    nav {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      background: rgba(0,0,0,0'3);
-      padding: 10px;
-    }
+/* CONTENEDOR GENERAL */
+.container {
+  max-width: 1000px;
+  margin: auto;
+  padding: 40px 20px;
+}
 
-    nav a {
-      color: white;
-      text-decoration: none;
-      font-weight: bold;
-    }
+/* HEADER */
+header {
+  text-align: center;
+  padding: 50px 20px 20px;
+  font-size: 42px;
+  font-weight: 600;
+  color: #38bdf8;
+  border-bottom: 1px solid rgba(255,255,255,0'1);
+}
 
-    nav a:hover {
-      color: #38bdf8;
-    }
+/* NAV */
+nav {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  padding: 15px;
+  border-bottom: 1px solid rgba(255,255,255,0'1);
+}
 
-    section {
-      padding: 40px;
-      max-width: 800px;
-      margin: auto;
-    }
+nav a {
+  color: #e2e8f0;
+  text-decoration: none;
+  font-weight: 500;
+  transition: 0'2s;
+}
 
-    h2 {
-      color: #38bdf8;
-    }
+nav a:hover {
+  color: #38bdf8;
+}
 
-    .card {
-      background: rgba(255,255,255,0'05);
-      padding: 20px;
-      border-radius: 10px;
-      margin-top: 20px;
-    }
+/* SECCIONES */
+section {
+  margin-top: 40px;
+}
 
-    footer {
-      text-align: center;
-      padding: 20px;
-      background: rgba(0,0,0,0'3);
-      margin-top: 40px;
-    }
-  </style>
+/* TITULOS */
+h2 {
+  color: #38bdf8;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+/* LINEA SEPARADORA */
+hr {
+  border: none;
+  height: 1px;
+  background: rgba(255,255,255,0'1);
+  margin: 15px 0 25px;
+}
+
+/* TARJETAS */
+.card {
+  background: rgba(255,255,255,0'03);
+  padding: 25px;
+  border-radius: 8px;
+  line-height: 1'6;
+}
+
+/* LISTAS */
+ul {
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 10px;
+}
+
+/* FOOTER */
+footer {
+  text-align: center;
+  padding: 25px;
+  margin-top: 50px;
+  border-top: 1px solid rgba(255,255,255,0'1);
+  font-size: 14px;
+  color: #94a3b8;
+}
+</style>
 </head>
+
 <body>
 
 <header>IC.corp</header>
@@ -73,43 +109,51 @@
   <a href="#contacto">Contacto</a>
 </nav>
 
+<div class="container">
+
 <section id="inicio">
   <h2>¿Qué es IC.corp?</h2>
+  <hr>
   <div class="card">
-    <p>IC.corp es una empresa innovadora centrada en la creación de proyectos digitales, videojuegos y herramientas web.</p>
-    <p>Nuestra misión es crear experiencias únicas combinando creatividad y tecnología.</p>
+    <p>IC.corp es una entidad enfocada en el desarrollo de soluciones digitales, incluyendo aplicaciones web, proyectos interactivos y experiencias tecnológicas.</p>
+    <p>Su objetivo es combinar innovación y funcionalidad para crear productos eficientes y accesibles.</p>
   </div>
 </section>
 
 <section id="sobre">
   <h2>Sobre nosotros</h2>
+  <hr>
   <div class="card">
-    <p>IC.corp fue fundada con la idea de desarrollar proyectos modernos y accesibles para todo el mundo.</p>
-    <p>Nos apasiona la programación, el diseño y la innovación.</p>
+    <p>IC.corp surge con la finalidad de desarrollar proyectos digitales modernos, manteniendo un enfoque en la calidad, la simplicidad y la innovación constante.</p>
+    <p>Se caracteriza por una mentalidad orientada al aprendizaje y la mejora continua.</p>
   </div>
 </section>
 
 <section id="proyectos">
   <h2>Proyectos</h2>
+  <hr>
   <div class="card">
     <ul>
-      <li>🎮 Juegos web</li>
-      <li>🌐 Páginas interactivas</li>
-      <li>🧠 Experimentos digitales</li>
+      <li>Desarrollo de juegos web interactivos</li>
+      <li>Creación de interfaces modernas</li>
+      <li>Experimentación con nuevas tecnologías</li>
     </ul>
   </div>
 </section>
 
 <section id="contacto">
   <h2>Contacto</h2>
+  <hr>
   <div class="card">
     <p>Email: iccorp@example.com</p>
     <p>GitHub: github.com/tuusuario</p>
   </div>
 </section>
 
+</div>
+
 <footer>
-  © 2026 IC.corp - Todos los derechos reservados
+  © 2026 IC.corp · Todos los derechos reservados
 </footer>
 
 </body>
