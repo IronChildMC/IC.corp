@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>IC.Beats</title>
+<link rel="icon" href="icon.ico" type="image/x-icon">
+<script src="jsmediatags.min.js"></script>
+<style>
+body{margin:0;font-family:Arial;background:radial-gradient(circle,#000,#120024,#001a33);color:white;text-align:center;overflow-x:hidden;}
+h1{text-shadow:0 0 25px cyan;}
+.panel{background:rgba(255,255,255,0.05);backdrop-filter:blur(12px);margin:10px auto;padding:10px;border-radius:15px;width:95%;max-width:1000px;box-shadow:0 0 25px rgba(0,255,255,0.3);}
+canvas{background:black;border-radius:12px;margin:10px;box-shadow:0 0 20px cyan;}
+input[type=range]{width:180px;accent-color:cyan;}
+.fileThumb{margin:5px;text-align:center;cursor:pointer;width:80px;}
+.fileThumb img{width:60px;height:60px;border-radius:8px;}
+.fileThumb div{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.selectedThumb{border:2px solid cyan;border-radius:8px;}
+button{margin:5px;padding:5px 10px;background:cyan;border:none;border-radius:10px;color:black;font-weight:bold;cursor:pointer;}
+button:hover{background:#0ff;}
+.collapsible{background:rgba(0,255,255,0.1);color:white;cursor:pointer;padding:10px;width:95%;border:none;text-align:left;outline:none;font-size:18px;border-radius:12px;margin:5px auto;box-shadow:0 0 20px rgba(0,255,255,0.2);}
+.active, .collapsible:hover{background:rgba(0,255,255,0.2);}
+.content{padding:0 18px;display:none;overflow:hidden;}
+</style>
+</head>
+<body>
+
+<h1>IC.Beats</h1>
+
+<!-- Biblioteca -->
+<button class="collapsible">📂 Archivos de audio / Biblioteca</button>
+<div class="content panel">
+<input type="file" id="folderInput" webkitdirectory multiple><br>
+<div id="fileList" style="display:flex;flex-wrap:wrap;margin-top:10px;"></div>
+<div style="margin-top:10px;">
+  Canción 1: <span id="selectedA">--</span> <button onclick="assignAudio('A')">Asignar a 1</button><br>
+  Canción 2: <span id="selectedB">--</span> <button onclick="assignAudio('B')">Asignar a 2</button>
+</div>
+</div>
+
+<!-- Mix y filtros -->
+<button class="collapsible">🎚️ Mix y Ecualizador</button>
+<div class="content panel">
+Crossfader: A ← <input type="range" id="crossSlider" min="0" max="1" step="0.01" value="0.5"> → B
+<br><br>
+Graves <input type="range" id="bassSlider" min="-30" max="30" value="0">
+Medios <input type="range" id="midSlider" min="-30" max="30" value="0">
+Agudos <input type="range" id="trebleSlider" min="-30" max="30" value="0">
+<br><br>
+Volumen <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
+<br><br>
+BPM A <input type="range" id="bpmSliderA" min="50" max="200" value="120"> 
+BPM B <input type="range" id="bpmSliderB" min="50" max="200" value="120">
+<br><br>
+<button id="playA">▶️ Canción 1</button>
+<button id="playB">▶️ Canción 2</button>
+</div>
+
+<!-- Visualizadores -->
+<button class="collapsible">📊 Visualizadores</button>
+<div class="content panel">
+<canvas id="wave" width="900" height="120"></canvas>
+<canvas id="circle" width="300" height="300"></canvas>
+<canvas id="bars" width="900" height="120"></canvas>
+<canvas id="heartbeat" width="900" height="120"></canvas>
+<button id="toggleSpec">Activar espectrograma</button>
+<canvas id="spectrogram" width="900" height="200" style="display:none"></canvas>
+</div>
+
+<!-- Grabación -->
+<button class="collapsible">💾 Grabación</button>
+<div class="content panel">
+<button id="recordBtn">Grabar mezcla</button>
+<a id="downloadLink" style="display:none" download="mezcla.wav">Descargar mezcla</a>
+</div>
+
+<audio id="audioA" controls style="display:none"></audio>
+<audio id="audioB" controls style="display:none"></audio>
+
+<script>
+// Collapsible
+let coll = document.getElementsByClassName("collapsible");
+for(let i=0;i<coll.length;i++){
+  coll[i].addEventListener("click", function(){
+    this.classList.toggle("active");
+    let content=this.nextElementSibling;
+    content.style.display = content.style.display==="block"?"none":"block";
+  });
+}
+
+// AudioContext y nodos
+let audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+let masterGain = audioCtx.createGain(); masterGain.connect(audioCtx.destination);
+let bassFilter = audioCtx.createBiquadFilter(); bassFilter.type="lowshelf"; bassFilter.frequency.value=200;
+let midFilter = audioCtx.createBiquadFilter(); midFilter.type="peaking"; midFilter.frequency.value=1000;
+let trebleFilter = audioCtx.createBiquadFilter(); trebleFilter.type="highshelf"; trebleFilter.frequency.value=3000;
+bassFilter.connect(midFilter); midFilter.connect(trebleFilter); trebleFilter.connect(masterGain);
+
+let gainA=audioCtx.createGain(), gainB=audioCtx.createGain();
+gainA.connect(bassFilter); gainB.connect(bassFilter);
+
+let analyserA=audioCtx.createAnalyser(), analyserB=audioCtx.createAnalyser();
+analyserA.fftSize=2048; analyserB.fftSize=2048;
+gainA.connect(analyserA); gainB.connect(analyserB);
+
+let analyserMaster = audioCtx.createAnalyser(); analyserMaster.fftSize=2048;
+trebleFilter.connect(analyserMaster);
+
+let srcRefA={current:null}, srcRefB={current:null};
+
+// Sliders y crossfader
+let bpmA=120, bpmB=120;
+bpmSliderA.oninput=e=>{bpmA=e.target.value; if(audioA) audioA.playbackRate=bpmA/120;}
+bpmSliderB.oninput=e=>{bpmB=e.target.value; if(audioB) audioB.playbackRate=bpmB/120;}
+crossSlider.oninput=e=>{gainA.gain.value=1-e.target.value; gainB.gain.value=e.target.value;}
+bassSlider.oninput=e=>bassFilter.gain.value=e.target.value;
+midSlider.oninput=e=>midFilter.gain.value=e.target.value;
+trebleSlider.oninput=e=>trebleFilter.gain.value=e.target.value;
+volumeSlider.oninput=e=>masterGain.gain.value=e.target.value;
+
+// Función para cargar audio
+function loadAudio(audioEl,file,srcRef,gainNode){
+  audioEl.src = URL.createObjectURL(file);
+  audioEl.load();
+  audioCtx.resume().then(()=>{
+    if(srcRef.current){ try{ srcRef.current.disconnect(); }catch(e){} srcRef.current=null; }
+    srcRef.current = audioCtx.createMediaElementSource(audioEl);
+    srcRef.current.connect(gainNode);
+  });
+}
+
+// Biblioteca con portadas y BPM
+let filesArray=[], currentSelect=null;
+function arrayBufferToBase64(buffer){let binary="";let bytes=new Uint8Array(buffer);for(let i=0;i<bytes.length;i++){binary+=String.fromCharCode(bytes[i]);} return btoa(binary);}
+async function loadFileWithTags(file){
+  return new Promise(resolve=>{
+    jsmediatags.read(file,{
+      onSuccess: tag=>{
+        let pic=tag.tags.picture; let bpm=tag.tags.TBPM||120;
+        let url=pic?`data:${pic.format};base64,${arrayBufferToBase64(pic.data)}`:"https://cdn-icons-png.flaticon.com/512/727/727245.png";
+        resolve({file,bpm,cover:url});
+      },
+      onError:e=>{resolve({file,bpm:120,cover:"https://cdn-icons-png.flaticon.com/512/727/727245.png"});}
+    });
+  });
+}
+async function buildLibrary(files){
+  filesArray=[]; fileList.innerHTML="";
+  for(let f of files){
+    let info=await loadFileWithTags(f);
+    filesArray.push(info);
+    let div=document.createElement("div"); div.className="fileThumb";
+    let img=document.createElement("img"); img.src=info.cover; div.appendChild(img);
+    let name=document.createElement("div"); name.innerText=info.file.name.split(".")[0]; div.appendChild(name);
+    let bpmLabel=document.createElement("div"); bpmLabel.innerText="BPM: "+info.bpm; bpmLabel.style.fontSize="10px"; div.appendChild(bpmLabel);
+    div.addEventListener("click",()=>{currentSelect=filesArray.indexOf(info); document.querySelectorAll(".fileThumb").forEach(el=>el.classList.remove("selectedThumb")); div.classList.add("selectedThumb");});
+    fileList.appendChild(div);
+  }
+}
+folderInput.addEventListener("change", e=>buildLibrary(Array.from(e.target.files)));
+
+// Asignar canción
+function assignAudio(target){
+  if(currentSelect===null) return;
+  let info=filesArray[currentSelect];
+  if(target==='A'){loadAudio(audioA,info.file,srcRefA,gainA); selectedA.innerText=info.file.name; bpmSliderA.value=info.bpm; bpmA=info.bpm; audioA.playbackRate=bpmA/120;}
+  else{loadAudio(audioB,info.file,srcRefB,gainB); selectedB.innerText=info.file.name; bpmSliderB.value=info.bpm; bpmB=info.bpm; audioB.playbackRate=bpmB/120;}
+}
+
+// Botones play/pause
+playA.onclick=()=>{if(audioA.paused){audioA.play(); playA.innerText="⏸️ Canción 1";} else{audioA.pause(); playA.innerText="▶️ Canción 1";}}
+playB.onclick=()=>{if(audioB.paused){audioB.play(); playB.innerText="⏸️ Canción 2";} else{audioB.pause(); playB.innerText="▶️ Canción 2";}}
+
+// Visualizadores y partículas
+const waveCtx=wave.getContext("2d");
+const circleCtx=circle.getContext("2d");
+const barsCtx=bars.getContext("2d");
+const heartbeatCtx=heartbeat.getContext("2d");
+const specCtx=spectrogram.getContext("2d");
+let specActive=false;
+toggleSpec.onclick=()=>{specActive=!specActive; spectrogram.style.display=specActive?"block":"none";}
+
+const particleCanvas=document.createElement("canvas");
+particleCanvas.width=window.innerWidth; particleCanvas.height=window.innerHeight;
+particleCanvas.style.position="fixed"; particleCanvas.style.top=0; particleCanvas.style.left=0; particleCanvas.style.zIndex=-1; 
+document.body.appendChild(particleCanvas);
+const pctx=particleCanvas.getContext("2d"); let particles=[];
+for(let i=0;i<150;i++){particles.push({x:Math.random()*particleCanvas.width,y:Math.random()*particleCanvas.height,size:Math.random()*2+1});}
+
+function draw(){
+  requestAnimationFrame(draw);
+  let data=new Uint8Array(analyserMaster.frequencyBinCount);
+  analyserMaster.getByteTimeDomainData(data);
+  // Waveform
+  waveCtx.fillStyle="black"; waveCtx.fillRect(0,0,900,120);
+  waveCtx.strokeStyle="cyan"; waveCtx.beginPath();
+  let slice=900/data.length, x=0;
+  for(let i=0;i<data.length;i++){let y=(data[i]/255)*120; if(i===0) waveCtx.moveTo(x,y); else waveCtx.lineTo(x,y); x+=slice;} waveCtx.stroke();
+  // Circular
+  analyserMaster.getByteFrequencyData(data); circleCtx.clearRect(0,0,300,300);
+  let center=150,radius=70;
+  for(let i=0;i<data.length;i+=8){let val=data[i]/255; let angle=(i/data.length)*Math.PI*2; let bar=radius+val*80; circleCtx.beginPath(); circleCtx.strokeStyle=`hsl(${i},100%,50%)`; circleCtx.moveTo(center+Math.cos(angle)*radius,center+Math.sin(angle)*radius); circleCtx.lineTo(center+Math.cos(angle)*bar,center+Math.sin(angle)*bar); circleCtx.stroke();}
+  // Barras
+  barsCtx.fillStyle="black"; barsCtx.fillRect(0,0,900,120);
+  for(let i=0;i<data.length;i+=4){let h=data[i]; barsCtx.fillStyle=`hsl(${i},100%,50%)`; barsCtx.fillRect(i*2,120-h/2,4,h/2);}
+  // ECG
+  let dataA = new Uint8Array(analyserA.frequencyBinCount);
+  let dataB = new Uint8Array(analyserB.frequencyBinCount);
+  analyserA.getByteTimeDomainData(dataA); analyserB.getByteTimeDomainData(dataB);
+  heartbeatCtx.fillStyle="black"; heartbeatCtx.fillRect(0,0,900,120);
+  heartbeatCtx.beginPath(); heartbeatCtx.strokeStyle="blue"; x=0;
+  for(let i=0;i<dataA.length;i++){let y=60+(dataA[i]-128)/2;if(i===0) heartbeatCtx.moveTo(x,y); else heartbeatCtx.lineTo(x,y); x+=900/dataA.length;} heartbeatCtx.stroke();
+  heartbeatCtx.beginPath(); heartbeatCtx.strokeStyle="red"; x=0;
+  for(let i=0;i<dataB.length;i++){let y=60+(dataB[i]-128)/2;if(i===0) heartbeatCtx.moveTo(x,y); else heartbeatCtx.lineTo(x,y); x+=900/dataB.length;} heartbeatCtx.stroke();
+  // Espectrograma
+  if(specActive){specCtx.drawImage(spectrogram,0,-1); for(let i=0;i<data.length;i++){let h=data[i]; specCtx.fillStyle=`rgb(${h},0,${255-h})`; specCtx.fillRect(i*3,199,3,1);}}
+}
+draw();
+
+// Partículas
+function animateParticles(){requestAnimationFrame(animateParticles); pctx.clearRect(0,0,particleCanvas.width,particleCanvas.height); let freqData=new Uint8Array(analyserMaster.frequencyBinCount); analyserMaster.getByteFrequencyData(freqData); let intensity=freqData.reduce((a,b)=>a+b)/freqData.length; particles.forEach(p=>{p.y+=1+intensity/150;if(p.y>particleCanvas.height)p.y=0;pctx.fillStyle=`rgba(0,255,255,${0.2+intensity/500})`; pctx.beginPath(); pctx.arc(p.x,p.y,p.size+intensity/200,0,Math.PI*2); pctx.fill();});}
+animateParticles();
+
+// Grabación
+let recorder,chunks=[];
+recordBtn.onclick=()=>{
+if(!recorder||recorder.state==='inactive'){
+const dest=audioCtx.createMediaStreamDestination();
+masterGain.connect(dest);
+recorder=new MediaRecorder(dest.stream);
+chunks=[];
+recorder.ondataavailable=e=>chunks.push(e.data);
+recorder.onstop=()=>{const blob=new Blob(chunks,{type:'audio/wav'}); const url=URL.createObjectURL(blob); downloadLink.href=url; downloadLink.style.display="inline";};
+recorder.start(); recordBtn.innerText="Detener grabación";
+}else{recorder.stop(); recordBtn.innerText="Grabar mezcla";}
+};
+</script>
+</body>
+</html>

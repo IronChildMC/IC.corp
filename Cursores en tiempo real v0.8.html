@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cursores en Tiempo Real</title>
+<style>
+  body { margin:0; overflow:hidden; background:#111; font-family: Arial; }
+  canvas { display:block; }
+  #serviceSelect {
+    position: fixed;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    font-size: 14px;
+    padding: 5px;
+  }
+  #chatInput {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    padding: 5px;
+    font-size: 14px;
+  }
+  #noPlayers {
+    position: fixed;
+    bottom: 70px;
+    width: 100%;
+    text-align: center;
+    color: #ccc;
+    font-size: 16px;
+    display:none;
+  }
+</style>
+</head>
+<body>
+
+<select id="serviceSelect">
+  <option value="turbowarp">TurboWarp</option>
+  <option value="ably">Ably</option>
+</select>
+
+<canvas id="c"></canvas>
+<input type="text" id="chatInput" placeholder="Escribe algo y presiona Enter...">
+<div id="noPlayers">Servidor apagado desde Ably</div>
+
+<script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+
+<script>
+/* =========================
+   ABLY
+   ========================= */
+const ABLY_API_KEY =
+"Elx66Q.AFiyUw:8zDDVrjVucL01O0HNUALoI8Qaz-G_7EjtZAKNkU0bJE";
+
+const channelName = "cursores";
+const controlChannelName = "server-control";
+
+const realtime = new Ably.Realtime({ key: ABLY_API_KEY });
+const ablyChannel = realtime.channels.get(channelName);
+const controlChannel = realtime.channels.get(controlChannelName);
+
+/* =========================
+   CANVAS
+   ========================= */
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+/* =========================
+   JUGADOR
+   ========================= */
+const id = Math.random().toString(36).slice(2);
+const name = prompt("Nombre de usuario:");
+
+let isAdmin = false;
+if(name === "IronChild"){
+  const company = prompt("Nombre de la Empresa:");
+  if(company === "IC.corp") isAdmin = true;
+}
+
+let players = {};
+players[id] = {
+  id,
+  name,
+  color: `hsl(${Math.random()*360},100%,50%)`,
+  x:0,
+  y:0,
+  message:""
+};
+
+/* =========================
+   PERSISTENCIA
+   ========================= */
+let bannedIds = new Set(JSON.parse(localStorage.getItem("bannedIds")||"[]"));
+let rainbowIds = new Set(JSON.parse(localStorage.getItem("rainbowIds")||"[]"));
+
+if(isAdmin) rainbowIds.add(id);
+if(rainbowIds.has(id)) players[id].color = "rainbow";
+if(bannedIds.has(id)) alert("El Admin Te Baneo");
+
+/* =========================
+   ESTADO SERVIDOR
+   ========================= */
+let serverOn = true;
+
+/* =========================
+   MENSAJES ABLY
+   ========================= */
+ablyChannel.subscribe(msg => {
+  const d = msg.data;
+  if(!serverOn) return;
+  players[d.id] = d;
+});
+
+controlChannel.subscribe(async message => {
+  if(message.data === "shutdown"){
+    console.log("Apagando servidor...");
+    serverOn = false;
+    document.getElementById("noPlayers").style.display = "block";
+  } else if(message.data === "start"){
+    console.log("Iniciando servidor...");
+    serverOn = true;
+    document.getElementById("noPlayers").style.display = "none";
+  } else if(typeof message.data === "string" && message.data.startsWith("msg-")){
+    const text = message.data.substring(4); // Extrae el texto después de msg-
+    alert(text); // alerta global a todos los usuarios
+  }
+});
+
+/* =========================
+   ENVIAR
+   ========================= */
+function sendUpdate(){
+  if(!serverOn || bannedIds.has(id)) return;
+  ablyChannel.publish("update", players[id]);
+}
+
+/* =========================
+   INPUT
+   ========================= */
+window.addEventListener("mousemove", e => {
+  if(!serverOn) return;
+  players[id].x = e.clientX;
+  players[id].y = e.clientY;
+  sendUpdate();
+});
+
+const chatInput = document.getElementById("chatInput");
+chatInput.addEventListener("keydown", e => {
+  if(e.key !== "Enter") return;
+
+  const text = chatInput.value.trim();
+  chatInput.value = "";
+  if(!text) return;
+
+  if(text.startsWith("/")){
+    const [cmd,target,...rest] = text.split(" ");
+    const msg = rest.join(" ");
+
+    if(isAdmin){
+      if(cmd === "/ban") alert("El Admin Te Baneo");
+      if(cmd === "/color" && players[target]) players[target].color="rainbow";
+      if(cmd === "/advertise" && target===id) alert("El Admin Te A Dado Un Aviso");
+    }
+    if(cmd === "/msg" && target===id) alert(`${isAdmin?"ADMIN":id}: ${msg}`);
+    return;
+  }
+
+  players[id].message = text;
+  sendUpdate();
+  setTimeout(()=>{players[id].message="";sendUpdate();},5000);
+});
+
+/* =========================
+   DIBUJO
+   ========================= */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  Object.values(players).forEach(p=>{
+    let c = p.color==="rainbow"
+      ? `hsl(${Date.now()*0.05%360},100%,50%)`
+      : p.color;
+
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,15,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle="yellow";
+    ctx.font="16px Arial"; // Aumentamos un poco la fuente
+    ctx.fillText(p.name,p.x-ctx.measureText(p.name).width/2,p.y-22);
+
+    if(p.message){
+      ctx.fillStyle="white";
+      ctx.font="14px Arial"; // Mensaje un poco más grande
+      ctx.fillText(p.message,p.x-ctx.measureText(p.message).width/2,p.y-37);
+    }
+  });
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>

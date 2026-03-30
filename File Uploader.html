@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>File Uploader</title>
+<script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+<style>
+body { font-family: Arial; max-width: 800px; margin: 40px auto; }
+button { padding: 8px 12px; margin-top: 10px; }
+progress { width: 100%; height: 20px; margin-top: 5px; }
+.file-item { border: 1px solid #ccc; padding: 15px; margin-top: 20px; }
+.preview { margin-top: 10px; max-width: 100%; max-height: 300px; }
+</style>
+</head>
+<body>
+
+<h2>File Uploader 📧</h2>
+<input type="file" id="fileInput">
+<button onclick="sendFile()">Enviar</button>
+
+<h3>Progreso envío</h3>
+<progress id="sendProgress" value="0" max="100"></progress>
+
+<h3>Archivos recibidos</h3>
+<div id="files"></div>
+
+<script>
+const ABLY_API_KEY = "L1yOpg.W7dp3A:stcXT81rV284dhbmJrdepOCSrqX_xJLooHhBCGC58Zc";
+const clientId = crypto.randomUUID();
+const BASE64_CHUNK_SIZE = 50000;
+
+const ably = new Ably.Realtime({ key: ABLY_API_KEY, clientId });
+const channel = ably.channels.get("file-base64-preview");
+
+const incoming = {};
+
+channel.subscribe("chunk", msg => {
+    if (msg.data.senderId === clientId) return;
+    receiveChunk(msg.data);
+});
+
+async function sendFile() {
+    const file = document.getElementById("fileInput").files[0];
+    if (!file) return alert("Selecciona archivo");
+
+    const fileId = crypto.randomUUID();
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = arrayBufferToBase64(arrayBuffer);
+
+    const totalLength = base64.length;
+    const totalChunks = Math.ceil(totalLength / BASE64_CHUNK_SIZE);
+
+    let sentLength = 0;
+
+    for (let i = 0; i < totalChunks; i++) {
+        const start = i * BASE64_CHUNK_SIZE;
+        const end = (i + 1) * BASE64_CHUNK_SIZE;
+        const chunk = base64.slice(start, end);
+
+        await channel.publish("chunk", {
+            senderId: clientId,
+            fileId,
+            index: i,
+            totalChunks,
+            name: file.name,
+            type: file.type,
+            totalLength,
+            chunk
+        });
+
+        sentLength += chunk.length;
+        updateProgress("sendProgress", sentLength / totalLength * 100);
+    }
+}
+
+function receiveChunk(data) {
+    const { fileId, index, totalChunks, name, type, totalLength, chunk } = data;
+
+    if (!incoming[fileId]) {
+        incoming[fileId] = {
+            meta: { name, type, totalChunks, totalLength },
+            chunks: new Array(totalChunks),
+            receivedLength: 0,
+            receivedCount: 0,
+            progressBar: createProgressBar(name)
+        };
+    }
+
+    const fileObj = incoming[fileId];
+
+    if (!fileObj.chunks[index]) {
+        fileObj.chunks[index] = chunk;
+        fileObj.receivedLength += chunk.length;
+        fileObj.receivedCount++;
+        updateProgress(fileObj.progressBar.id,
+            fileObj.receivedLength / totalLength * 100);
+    }
+
+    if (fileObj.receivedCount === totalChunks) {
+        reconstructFile(fileId);
+    }
+}
+
+function reconstructFile(fileId) {
+    const fileObj = incoming[fileId];
+    const { meta, chunks } = fileObj;
+
+    const fullBase64 = chunks.join("");
+    const binary = atob(fullBase64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { type: meta.type });
+    renderFile(meta.name, blob, meta.type);
+
+    fileObj.progressBar.remove();
+    delete incoming[fileId];
+}
+
+function renderFile(name, blob, type) {
+    const container = document.getElementById("files");
+    const div = document.createElement("div");
+    div.className = "file-item";
+
+    const url = URL.createObjectURL(blob);
+
+    const title = document.createElement("strong");
+    title.textContent = name;
+    div.appendChild(title);
+
+    const preview = createPreview(url, type);
+    if (preview) {
+        preview.classList.add("preview");
+        div.appendChild(preview);
+    }
+
+    const btn = document.createElement("button");
+    btn.textContent = "Descargar";
+    btn.onclick = () => {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        link.click();
+    };
+
+    div.appendChild(btn);
+    container.appendChild(div);
+}
+
+function createPreview(url, type) {
+    if (type.startsWith("image/")) {
+        const img = document.createElement("img");
+        img.src = url;
+        return img;
+    }
+    if (type.startsWith("video/")) {
+        const video = document.createElement("video");
+        video.src = url;
+        video.controls = true;
+        return video;
+    }
+    if (type.startsWith("audio/")) {
+        const audio = document.createElement("audio");
+        audio.src = url;
+        audio.controls = true;
+        return audio;
+    }
+    if (type.startsWith("text/")) {
+        const iframe = document.createElement("iframe");
+        iframe.src = url;
+        iframe.style.width = "100%";
+        iframe.style.height = "200px";
+        return iframe;
+    }
+    return null;
+}
+
+function createProgressBar(name) {
+    const container = document.getElementById("files");
+    const wrapper = document.createElement("div");
+    wrapper.className = "file-item";
+
+    const label = document.createElement("div");
+    label.textContent = "Recibiendo " + name;
+
+    const progress = document.createElement("progress");
+    progress.max = 100;
+    progress.value = 0;
+    progress.id = crypto.randomUUID();
+
+    wrapper.appendChild(label);
+    wrapper.appendChild(progress);
+    container.appendChild(wrapper);
+
+    return progress;
+}
+
+function updateProgress(id, percent) {
+    const progress = document.getElementById(id);
+    if (progress) progress.value = percent;
+}
+
+function arrayBufferToBase64(buffer) {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+</script>
+
+</body>
+</html>

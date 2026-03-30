@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Snake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ADLaM+Display&display=swap" rel="stylesheet">
+<style>
+body{margin:0;text-align:center;font-family:'ADLaM Display',cursive;background:#000;color:#fff}
+canvas{display:block;margin:30px auto;border:3px solid #fff;border-radius:6px;background:#111}
+h1{margin-top:20px}
+button{padding:10px 20px;font-family:'ADLaM Display';font-size:18px;border:none;border-radius:6px;cursor:pointer;display:none;margin:auto}
+</style>
+</head>
+<body>
+<h1>Snake</h1>
+<canvas id="game" width="500" height="500"></canvas>
+<button id="restartBtn">Reiniciar</button>
+<audio id="eatSound" src="" ></audio>
+<audio id="gameOverSound" src="" ></audio>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const restartBtn=document.getElementById('restartBtn');
+const eatSound=document.getElementById('eatSound');
+const gameOverSound=document.getElementById('gameOverSound');
+
+const gridSize=25;
+const tileCount=canvas.width/gridSize;
+
+let snake, direction, nextDirection, apple, score, highscore, gameOver;
+
+highscore=parseInt(localStorage.getItem('snakeHighscore'))||0;
+
+function init(){
+  snake=[{x:10,y:10}];
+  direction={x:1,y:0};
+  nextDirection={x:1,y:0};
+  apple=randomApple();
+  score=0;
+  gameOver=false;
+  restartBtn.style.display='none';
+}
+
+function randomApple(){
+  let pos;
+  do{
+    pos={x:Math.floor(Math.random()*tileCount),y:Math.floor(Math.random()*tileCount)};
+  }while(snake && snake.some(s=>s.x===pos.x&&s.y===pos.y));
+  return pos;
+}
+
+document.addEventListener('keydown',e=>{
+  if(gameOver) return;
+  if(e.key==='w'&&direction.y===0) nextDirection={x:0,y:-1};
+  if(e.key==='s'&&direction.y===0) nextDirection={x:0,y:1};
+  if(e.key==='a'&&direction.x===0) nextDirection={x:-1,y:0};
+  if(e.key==='d'&&direction.x===0) nextDirection={x:1,y:0};
+});
+
+restartBtn.onclick=()=>{
+  init();
+};
+
+function update(){
+  if(gameOver) return;
+
+  direction=nextDirection;
+  const head={x:snake[0].x+direction.x,y:snake[0].y+direction.y};
+
+  if(head.x<0||head.y<0||head.x>=tileCount||head.y>=tileCount||snake.some(s=>s.x===head.x&&s.y===head.y)){
+    gameOver=true;
+    if(score>highscore){
+      highscore=score;
+      localStorage.setItem('snakeHighscore',highscore);
+    }
+    restartBtn.style.display='inline-block';
+    gameOverSound.play();
+    draw();
+    return;
+  }
+
+  snake.unshift(head);
+
+  if(head.x===apple.x&&head.y===apple.y){
+    score++;
+    apple=randomApple();
+    eatSound.play();
+  }else{
+    snake.pop();
+  }
+
+  draw();
+}
+
+function draw(){
+  ctx.fillStyle='#111';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle='red';
+  ctx.fillRect(apple.x*gridSize,apple.y*gridSize,gridSize,gridSize);
+
+  ctx.fillStyle='lime';
+  snake.forEach(s=>ctx.fillRect(s.x*gridSize,s.y*gridSize,gridSize,gridSize));
+
+  ctx.fillStyle='white';
+  ctx.font='18px "ADLaM Display"';
+  ctx.fillText('Score: '+score,10,22);
+  ctx.fillText('Highscore: '+highscore,10,44);
+
+  if(gameOver){
+    ctx.font='36px "ADLaM Display"';
+    ctx.fillText('GAME OVER',120,250);
+  }
+}
+
+init();
+setInterval(update,120);
+draw();
+</script>
+</body>
+</html>

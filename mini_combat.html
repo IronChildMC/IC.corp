@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mini Combat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ADLaM+Display&display=swap" rel="stylesheet">
+<style>
+body{margin:0;text-align:center;font-family:'ADLaM Display',cursive;background:#222;color:#fff}
+canvas{display:block;margin:20px auto;border:3px solid #fff;border-radius:6px;background:#333}
+h1{margin-top:10px}
+button{margin:5px;padding:5px 10px;font-family:'ADLaM Display',cursive;}
+</style>
+</head>
+<body>
+<h1>Mini Combat</h1>
+<canvas id="game" width="500" height="500"></canvas>
+<div>
+<button id="saveBtn">Guardar Partida</button>
+<button id="loadBtn">Cargar Partida</button>
+<button id="deleteBtn">Eliminar Partida</button>
+</div>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+
+const tileSize=25;
+const mapWidth=20;
+const mapHeight=20;
+
+let level=1;
+let player={x:10,y:10,hp:10,atk:0,def:1,exp:0,shield:false};
+let enemies=[];
+let items=[];
+
+function spawnEnemy(){
+  return {x:Math.floor(Math.random()*mapWidth),y:Math.floor(Math.random()*mapHeight),hp:level,atk:0};
+}
+
+function spawnItem(){
+  let rnd=Math.random();
+  let type='atk';
+  if(rnd<0.55) type='atk';
+  else if(rnd<0.8) type='def';
+  else type='heal';
+  return {x:Math.floor(Math.random()*mapWidth),y:Math.floor(Math.random()*mapHeight),type:type};
+}
+
+function initLevel(){
+  player.x=10; player.y=10;
+  enemies=[];
+  items=[];
+  for(let i=0;i<level+4;i++) enemies.push(spawnEnemy());
+  let numItems=Math.max(2,Math.min(5,Math.floor(Math.random()*4)+2));
+  for(let i=0;i<numItems;i++) items.push(spawnItem());
+}
+
+initLevel();
+
+function moveEnemies(){
+  enemies.forEach(e=>{
+    let dir=Math.floor(Math.random()*4);
+    let nx=e.x, ny=e.y;
+    if(dir===0) nx+=1;
+    if(dir===1) nx-=1;
+    if(dir===2) ny+=1;
+    if(dir===3) ny-=1;
+    if(nx>=0 && nx<mapWidth && ny>=0 && ny<mapHeight) { e.x=nx; e.y=ny; }
+  });
+}
+
+function draw(){
+  ctx.fillStyle='#333';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle='cyan';
+  ctx.fillRect(player.x*tileSize,player.y*tileSize,tileSize,tileSize);
+
+  ctx.fillStyle='red';
+  enemies.forEach(e=>ctx.fillRect(e.x*tileSize,e.y*tileSize,tileSize,tileSize));
+
+  ctx.fillStyle='yellow';
+  items.forEach(i=>ctx.fillRect(i.x*tileSize,i.y*tileSize,tileSize,tileSize));
+
+  ctx.fillStyle='white';
+  ctx.font='16px "ADLaM Display"';
+  ctx.fillText(`HP: ${player.hp} ATK: ${player.atk} DEF: ${player.def} EXP: ${player.exp} LEVEL: ${level}`,10,16);
+  if(player.shield) ctx.fillText('ESCUDO ACTIVO',10,36);
+}
+
+document.addEventListener('keydown',e=>{
+  let dx=0,dy=0;
+  if(e.key==='w') dy=-1;
+  if(e.key==='s') dy=1;
+  if(e.key==='a') dx=-1;
+  if(e.key==='d') dx=1;
+
+  if(e.key==='q'){
+    if(player.def>0){ player.shield=true; player.def-=1; } else { player.shield=false; }
+  }
+
+  if(e.key==='e'){
+    enemies.forEach((en,idx)=>{
+      if(Math.abs(en.x-player.x)<=1 && Math.abs(en.y-player.y)<=1){
+        en.hp-=player.atk;
+        if(en.hp<=0){ enemies.splice(idx,1); player.exp+=1; }
+      }
+    });
+  }
+
+  let newX=player.x+dx;
+  let newY=player.y+dy;
+  if(newX>=0 && newX<mapWidth && newY>=0 && newY<mapHeight){ player.x=newX; player.y=newY; }
+
+  items.forEach((it,idx)=>{
+    if(it.x===player.x && it.y===player.y){
+      if(it.type==='atk'){ player.atk+=1; }
+      else if(it.type==='def'){ player.def+=1; }
+      else if(it.type==='heal'){ player.hp+=Math.floor(Math.random()*3)+1; }
+      items.splice(idx,1);
+    }
+  });
+
+  moveEnemies();
+
+  enemies.forEach(en=>{
+    if(en.x===player.x && en.y===player.y){
+      // El enemigo no hace daño, solo interacción
+      player.shield=false;
+    }
+  });
+
+  if(enemies.length===0){ level++; initLevel(); }
+
+  draw();
+});
+
+function saveGame(){
+  let slots=['slot1','slot2','slot3'];
+  let name=prompt('Nombre de la partida:');
+  if(!name) return;
+  let slotIdx=prompt('Selecciona un slot (1-3)');
+  let idx=parseInt(slotIdx)-1;
+  if(idx<0 || idx>2) return;
+  localStorage.setItem(slots[idx], JSON.stringify({name:name,player:player,level:level}));
+  alert('Partida guardada!');
+}
+
+function loadGame(){
+  let slots=['slot1','slot2','slot3'];
+  let options=slots.map(s=>{let d=localStorage.getItem(s); return d?JSON.parse(d).name:'Vacío';});
+  let sel=prompt(`Selecciona una partida para cargar:\n1:${options[0]}\n2:${options[1]}\n3:${options[2]}`);
+  let idx=parseInt(sel)-1;
+  if(idx<0 || idx>2) return;
+  let data=localStorage.getItem(slots[idx]);
+  if(data){
+    let d=JSON.parse(data);
+    player=d.player; level=d.level;
+    initLevel(); draw();
+    alert(`Partida ${d.name} cargada!`);
+  }
+}
+
+function deleteGame(){
+  let slots=['slot1','slot2','slot3'];
+  let options=slots.map(s=>{let d=localStorage.getItem(s); return d?JSON.parse(d).name:'Vacío';});
+  let sel=prompt(`Selecciona la partida a eliminar:\n1:${options[0]}\n2:${options[1]}\n3:${options[2]}`);
+  let idx=parseInt(sel)-1;
+  if(idx<0 || idx>2) return;
+  localStorage.removeItem(slots[idx]);
+  alert('Partida eliminada!');
+}
+
+document.getElementById('saveBtn').onclick=saveGame;
+document.getElementById('loadBtn').onclick=loadGame;
+document.getElementById('deleteBtn').onclick=deleteGame;
+
+draw();
+</script>
+</body>
+</html>

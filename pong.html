@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pong</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=ADLaM+Display&display=swap" rel="stylesheet">
+<style>
+body{margin:0;text-align:center;font-family:'ADLaM Display',cursive;background:#000}
+canvas{display:block;margin:30px auto;border:3px solid #fff;border-radius:6px;background:#000}
+button{padding:10px 20px;font-size:18px;border:none;border-radius:6px;background:#ffd93d;cursor:pointer;font-family:'ADLaM Display'}
+button:hover{transform:scale(1.05)}
+#musicBtn{position:fixed;bottom:10px;right:10px;font-size:14px}
+</style>
+</head>
+<body>
+<h1>Pong</h1>
+<canvas id="game" width="800" height="500"></canvas>
+<button id="musicBtn">Musica</button>
+<audio id="bgMusic" loop></audio>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const musicBtn=document.getElementById('musicBtn');
+const bgMusic=document.getElementById('bgMusic');
+
+let leftY=200,rightY=200;
+let ball={x:400,y:250,vx:4,vy:4,radius:10};
+let leftScore=0,rightScore=0;
+let keys={};
+let onePlayer=false;
+let botDirection=1;
+let lastBotChange=Date.now();
+
+document.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  if(e.key.toLowerCase()==='e' && !onePlayer){
+    let answer=confirm('Verdadero o falso: ¿Quieres pasar a 1P?');
+    if(answer) onePlayer=true;
+  }
+});
+document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+musicBtn.onclick=()=>{
+  const i=document.createElement('input');
+  i.type='file';
+  i.accept='.mp3,.wav';
+  i.onchange=e=>{
+    bgMusic.src=URL.createObjectURL(e.target.files[0]);
+    bgMusic.play();
+  };
+  i.click();
+};
+
+function update(){
+  if(keys['w'] && leftY>0) leftY-=5;
+  if(keys['s'] && leftY<canvas.height-100) leftY+=5;
+
+  if(onePlayer){
+    let diff=ball.y-(rightY+50);
+    let speed=rightScore===0 ? 4 : Math.max(leftScore/rightScore,2);
+
+    // Probabilidad de 20% por segundo de cambiar dirección
+    if(Date.now()-lastBotChange>1000){
+      if(Math.random()<0.2) botDirection*=-1;
+      lastBotChange=Date.now();
+    }
+
+    // Movimiento del bot, asegurando que no se salga del mapa
+    if(diff*botDirection>0) rightY+=Math.min(Math.abs(diff),speed);
+    else rightY-=Math.min(Math.abs(diff),speed);
+    if(rightY<0) rightY=0;
+    if(rightY>canvas.height-100) rightY=canvas.height-100;
+  } else {
+    if(keys['arrowup'] && rightY>0) rightY-=5;
+    if(keys['arrowdown'] && rightY<canvas.height-100) rightY+=5;
+  }
+
+  ball.x+=ball.vx;
+  ball.y+=ball.vy;
+
+  if(ball.y<0 || ball.y>canvas.height) ball.vy*=-1;
+
+  if(ball.x-ball.radius<50 && ball.y>leftY && ball.y<leftY+100) ball.vx*=-1;
+  if(ball.x+ball.radius>canvas.width-50 && ball.y>rightY && ball.y<rightY+100) ball.vx*=-1;
+
+  if(ball.x<0){rightScore++;resetBall();}
+  if(ball.x>canvas.width){leftScore++;resetBall();}
+
+  draw();
+  requestAnimationFrame(update);
+}
+
+function resetBall(){
+  ball.x=400; ball.y=250; ball.vx=(Math.random()<0.5?1:-1)*4; ball.vy=(Math.random()<0.5?1:-1)*4;
+}
+
+function draw(){
+  ctx.fillStyle='black';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle='white';
+  ctx.fillRect(50,leftY,10,100);
+  ctx.fillRect(canvas.width-60,rightY,10,100);
+
+  ctx.beginPath();
+  ctx.arc(ball.x,ball.y,ball.radius,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.font='32px "ADLaM Display"';
+  ctx.fillText(leftScore,canvas.width/4,50);
+  ctx.fillText(rightScore,3*canvas.width/4,50);
+}
+
+update();
+</script>
+</body>
+</html>
