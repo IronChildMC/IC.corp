@@ -5,22 +5,69 @@
 <title>IC.corp</title>
 <link rel="icon" href="Logo IC.corp.png">
 <style>
-body {margin:0; font-family:"Segoe UI",Arial,sans-serif; background:#fff; color:#0f172a;}
+body {margin:0; font-family:"Segoe UI",Arial,sans-serif; background:#fff; color:#0f172a; overflow-x:hidden;}
+
+/* --- INTRO --- */
+#intro {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:#fff; display:flex; justify-content:center; align-items:center; z-index:9999;
+  flex-direction:column; overflow:hidden;
+}
+
+/* PARTICULAS SUTILES */
+.particle {
+  position:absolute; width:4px; height:4px; border-radius:50%;
+  background:rgba(249,115,22,0.6);
+  animation:particleMove linear infinite;
+}
+@keyframes particleMove {
+  0% {transform:translateY(0) translateX(0);}
+  100% {transform:translateY(-100vh) translateX(50vw);}
+}
+
+#intro img {
+  width:150px; opacity:0; transform:scale(0.5);
+  animation:introAnim 2s forwards;
+}
+@keyframes introAnim {
+  0% {opacity:0; transform:scale(0.5);}
+  50% {opacity:1; transform:scale(1.2);}
+  100% {opacity:1; transform:scale(1);}
+}
+
+/* --- LINEAS VERTICALES --- */
+.line {
+  position:absolute; top:0; width:2%; height:100%;
+  background:linear-gradient(to bottom, #f97316, #3b82f6);
+  animation:lineAnim 0.8s forwards;
+}
+@keyframes lineAnim {
+  0% {transform:translateY(0);}
+  50% {transform:translateY(-100%);}
+  100% {transform:translateY(100%);}
+}
+
+/* --- HEADER Y NAV --- */
 header{position:sticky; top:0; background:#fff; border-bottom:2px solid #f97316; z-index:1000;}
 .nav-container{max-width:1100px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;}
 nav a{color:#0f172a;text-decoration:none;font-weight:500;padding:5px 10px;border:2px solid transparent;border-radius:5px;transition:all 0.3s;}
-nav a:hover{border:2px solid #f97316;}
+nav a:hover{border:2px solid #f97316; transform:scale(1.05);}
 .container{max-width:1100px;margin:auto;padding:40px 20px;}
 h2{color:#0f172a;margin-bottom:10px;}
 hr{border:none;height:1px;background:#f97316;margin:10px 0 20px;}
-.card{background:#fff;padding:15px;border:1px solid #f97316;border-radius:8px;margin-bottom:15px;opacity:0; transform:translateY(20px); transition:all 0.6s ease;}
+.card{background:#fff;padding:15px;border:1px solid #f97316;border-radius:8px;margin-bottom:15px;opacity:0; transform:translateY(20px); transition:all 0.7s cubic-bezier(0.68,-0.55,0.27,1.55);}
 .card.visible{opacity:1; transform:translateY(0);}
-.btn-link{display:inline-block;margin-top:8px;padding:8px 15px;background:#f97316;color:#fff;border:none;border-radius:5px;text-decoration:none;font-weight:bold;transition:all 0.3s;}
-.btn-link:hover{background:#ea580c;}
 footer{text-align:center;padding:25px;margin-top:60px;border-top:2px solid #f97316;color:#0f172a;}
+.btn-link{display:inline-block;margin-top:8px;padding:8px 15px;background:#f97316;color:#fff;border:none;border-radius:5px;text-decoration:none;font-weight:bold;transition:all 0.3s;}
+.btn-link:hover{background:#ea580c; transform:scale(1.05);}
 </style>
 </head>
 <body>
+
+<!-- INTRO -->
+<div id="intro">
+  <img src="Logo IC.corp.png" alt="Logo IC.corp">
+</div>
 
 <header>
   <div class="nav-container">
@@ -34,19 +81,58 @@ footer{text-align:center;padding:25px;margin-top:60px;border-top:2px solid #f973
   </div>
 </header>
 
-<div class="container">
+<div class="container" id="mainContent" style="display:none;">
 <section>
   <h2>Bienvenido a IC.corp</h2>
   <hr>
-  <div class="card visible">IC.corp desarrolla soluciones digitales y programas innovadores.</div>
+  <div class="card">IC.corp desarrolla soluciones digitales y programas innovadores.</div>
 </section>
 </div>
 
 <footer>© 2026 IC.corp</footer>
 
 <script>
-const cards = document.querySelectorAll(".card");
-cards.forEach((c,i)=>setTimeout(()=>c.classList.add("visible"), i*150));
+// Animacion intro avanzada
+window.addEventListener("load", () => {
+  const intro = document.getElementById("intro");
+  const main = document.getElementById("mainContent");
+
+  // Crear particulas
+  for(let i=0;i<30;i++){
+    const p = document.createElement("div");
+    p.className="particle";
+    p.style.left=Math.random()*100+"%";
+    p.style.top=Math.random()*100+"%";
+    p.style.width=p.style.height= (2+Math.random()*3)+"px";
+    p.style.animationDuration=(2+Math.random()*2)+"s";
+    intro.appendChild(p);
+  }
+
+  // Esperar intro
+  setTimeout(() => {
+    // Crear lineas verticales
+    const numLines = 10;
+    for(let i=0;i<numLines;i++){
+      const line = document.createElement("div");
+      line.classList.add("line");
+      line.style.left = (i*(100/numLines))+"%";
+      line.style.animationDelay = (i*0.05)+"s";
+      intro.appendChild(line);
+    }
+
+    // Ocultar intro
+    setTimeout(()=>{
+      intro.style.transition="opacity 0.5s";
+      intro.style.opacity=0;
+      setTimeout(()=>intro.style.display="none",500);
+      main.style.display="block";
+
+      // Animar cards
+      const cards=document.querySelectorAll(".card");
+      cards.forEach((c,i)=>setTimeout(()=>c.classList.add("visible"),i*150));
+    },800);
+  }, 2500);
+});
 </script>
 
 </body>
